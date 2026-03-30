@@ -108,13 +108,13 @@ impl CellularAutomata {
         }
     }
 
-    pub fn rule_interlace<T>(&mut self, iterations: u32, rule: &[T]) -> Result<()>
+    pub fn rule_interlace<T>(&mut self, iterations: u32, rule: &[T], second: bool) -> Result<()>
     where
         T: IntoRule,
     {
         self.starting_line();
 
-        let mut count = 0;
+        let mut count = if second { 1 } else { 0 };
 
         for _ in 0..iterations {
             for rule in rule {
@@ -162,7 +162,18 @@ impl CellularAutomata {
                         return Ok(());
                     }
 
-                    self.image.put_pixel(v, count, n);
+                    if second {
+                        let old = *self.image.get_pixel(v, count - 2) == PIXEL_DARK;
+
+                        let new = if old ^ (n == PIXEL_DARK) {
+                            PIXEL_DARK
+                        } else {
+                            PIXEL_LIGHT
+                        };
+                        self.image.put_pixel(v, count, new);
+                    } else {
+                        self.image.put_pixel(v, count, n);
+                    }
                 }
             }
         }
@@ -213,7 +224,7 @@ mod test {
         let data: Vec<u8> = r.random_iter().take(16).collect();
         let len = data.len() as u32 * 8;
         let mut v = CellularAutomata::new(data);
-        v.rule_interlace(len, &[110]).unwrap();
+        v.rule_interlace(len, &[110], true).unwrap();
 
         let image = v.image();
         let mut f = File::create("./test.png").unwrap();
