@@ -1,6 +1,4 @@
-use std::iter;
-
-use image::{GrayImage, ImageBuffer, Luma};
+use image::{GrayImage, Luma};
 
 use crate::{
     error::{Error, Result},
@@ -20,7 +18,7 @@ impl Rule {
         self.0 >> pos & 0x1 == 1
     }
 
-    fn pixel(&self, pos: usize) -> Luma<u8> {
+    pub fn pixel(&self, pos: usize) -> Luma<u8> {
         if self.get(pos) {
             PIXEL_DARK
         } else {
@@ -28,7 +26,7 @@ impl Rule {
         }
     }
 
-    fn bits(&self) -> [u8; 8] {
+    pub fn bits(&self) -> [u8; 8] {
         let mut out: [u8; 8] = [0; 8];
         for x in 0..8 {
             if self.get(x) {
@@ -110,7 +108,7 @@ impl CellularAutomata {
         }
     }
 
-    fn rule_interlace<T>(&mut self, iterations: u32, rule: &[T]) -> Result<()>
+    pub fn rule_interlace<T>(&mut self, iterations: u32, rule: &[T]) -> Result<()>
     where
         T: IntoRule,
     {
