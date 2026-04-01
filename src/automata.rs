@@ -7,7 +7,107 @@ use crate::{
 
 pub struct CellularAutomata<'a> {
     data: &'a [u8],
-    image: GrayImage,
+    pub image: GrayImage,
+}
+
+pub struct RuleInterlace<'a, 'b, 'c, T> {
+    iterations: u32,
+    rule: &'b [T],
+    second: bool,
+    offset_x: u32,
+    offset_y: u32,
+    automata: &'a mut CellularAutomata<'c>,
+}
+
+impl<'a, 'b, 'c, T> RuleInterlace<'a, 'b, 'c, T>
+where
+    T: IntoRule,
+{
+    pub fn second(&mut self, second: bool) -> &mut Self {
+        self.second = second;
+        self
+    }
+
+    pub fn offset(&mut self, x: u32, y: u32) -> &mut Self {
+        self.offset_x = x;
+        self.offset_y = y;
+        self
+    }
+
+    pub fn iterations(&mut self, iterations: u32) -> &mut Self {
+        self.iterations = iterations;
+        self
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        self.automata.starting_line();
+
+        let mut count = if self.second { 1 } else { 0 };
+
+        for _ in 0..self.iterations {
+            for rule in self.rule {
+                count += 1;
+                let rule = rule.get_rule()?;
+
+                for v in 0..self.automata.data.len() * 8 {
+                    let v = v as u32;
+
+                    let a = if v > 0 {
+                        *self.automata.image.get_pixel(v - 1, count - 1)
+                    } else {
+                        PIXEL_LIGHT
+                    };
+
+                    let b = *self.automata.image.get_pixel(v, count - 1);
+
+                    let c = if v + 1 < self.automata.data.len() as u32 * 8 {
+                        *self.automata.image.get_pixel(v + 1, count - 1)
+                    } else {
+                        PIXEL_LIGHT
+                    };
+
+                    let n = if a == PIXEL_DARK && b == PIXEL_DARK && c == PIXEL_DARK {
+                        rule.pixel(0)
+                    } else if a == PIXEL_DARK && b == PIXEL_DARK && c == PIXEL_LIGHT {
+                        rule.pixel(1)
+                    } else if a == PIXEL_DARK && b == PIXEL_LIGHT && c == PIXEL_DARK {
+                        rule.pixel(2)
+                    } else if a == PIXEL_DARK && b == PIXEL_LIGHT && c == PIXEL_LIGHT {
+                        rule.pixel(3)
+                    } else if a == PIXEL_LIGHT && b == PIXEL_DARK && c == PIXEL_DARK {
+                        rule.pixel(4)
+                    } else if a == PIXEL_LIGHT && b == PIXEL_DARK && c == PIXEL_LIGHT {
+                        rule.pixel(5)
+                    } else if a == PIXEL_LIGHT && b == PIXEL_LIGHT && c == PIXEL_DARK {
+                        rule.pixel(6)
+                    } else if a == PIXEL_LIGHT && b == PIXEL_LIGHT && c == PIXEL_LIGHT {
+                        rule.pixel(7)
+                    } else {
+                        PIXEL_LIGHT
+                    };
+
+                    if count >= self.iterations {
+                        return Ok(());
+                    }
+
+                    if self.second {
+                        let old = *self.automata.image.get_pixel(v, count - 2) == PIXEL_DARK;
+
+                        let new = if old ^ (n == PIXEL_DARK) {
+                            PIXEL_DARK
+                        } else {
+                            PIXEL_LIGHT
+                        };
+                        self.automata.image.put_pixel(v, count, new);
+                    } else {
+                        self.automata.image.put_pixel(v, count, n);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -123,81 +223,18 @@ impl<'a> CellularAutomata<'a> {
         }
     }
 
-    pub fn rule_interlace<T>(&mut self, iterations: u32, rule: &[T], second: bool) -> Result<()>
+    pub fn rule_interlace<'b, 'c, T>(&'c mut self, rule: &'b [T]) -> RuleInterlace<'c, 'b, 'a, T>
     where
         T: IntoRule,
     {
-        self.starting_line();
-
-        let mut count = if second { 1 } else { 0 };
-
-        for _ in 0..iterations {
-            for rule in rule {
-                count += 1;
-                let rule = rule.get_rule()?;
-
-                for v in 0..self.data.len() * 8 {
-                    let v = v as u32;
-
-                    let a = if v > 0 {
-                        *self.image.get_pixel(v - 1, count - 1)
-                    } else {
-                        PIXEL_LIGHT
-                    };
-
-                    let b = *self.image.get_pixel(v, count - 1);
-
-                    let c = if v + 1 < self.data.len() as u32 * 8 {
-                        *self.image.get_pixel(v + 1, count - 1)
-                    } else {
-                        PIXEL_LIGHT
-                    };
-
-                    let n = if a == PIXEL_DARK && b == PIXEL_DARK && c == PIXEL_DARK {
-                        rule.pixel(0)
-                    } else if a == PIXEL_DARK && b == PIXEL_DARK && c == PIXEL_LIGHT {
-                        rule.pixel(1)
-                    } else if a == PIXEL_DARK && b == PIXEL_LIGHT && c == PIXEL_DARK {
-                        rule.pixel(2)
-                    } else if a == PIXEL_DARK && b == PIXEL_LIGHT && c == PIXEL_LIGHT {
-                        rule.pixel(3)
-                    } else if a == PIXEL_LIGHT && b == PIXEL_DARK && c == PIXEL_DARK {
-                        rule.pixel(4)
-                    } else if a == PIXEL_LIGHT && b == PIXEL_DARK && c == PIXEL_LIGHT {
-                        rule.pixel(5)
-                    } else if a == PIXEL_LIGHT && b == PIXEL_LIGHT && c == PIXEL_DARK {
-                        rule.pixel(6)
-                    } else if a == PIXEL_LIGHT && b == PIXEL_LIGHT && c == PIXEL_LIGHT {
-                        rule.pixel(7)
-                    } else {
-                        PIXEL_LIGHT
-                    };
-
-                    if count >= iterations {
-                        return Ok(());
-                    }
-
-                    if second {
-                        let old = *self.image.get_pixel(v, count - 2) == PIXEL_DARK;
-
-                        let new = if old ^ (n == PIXEL_DARK) {
-                            PIXEL_DARK
-                        } else {
-                            PIXEL_LIGHT
-                        };
-                        self.image.put_pixel(v, count, new);
-                    } else {
-                        self.image.put_pixel(v, count, n);
-                    }
-                }
-            }
+        RuleInterlace {
+            iterations: self.data.len() as u32,
+            rule,
+            second: false,
+            offset_x: 0,
+            offset_y: 0,
+            automata: self,
         }
-
-        Ok(())
-    }
-
-    pub fn image(self) -> GrayImage {
-        self.image
     }
 }
 
