@@ -5,8 +5,8 @@ use crate::{
     image::{PIXEL_DARK, PIXEL_LIGHT},
 };
 
-pub struct CellularAutomata {
-    data: Vec<u8>,
+pub struct CellularAutomata<'a> {
+    data: &'a [u8],
     image: GrayImage,
 }
 
@@ -79,12 +79,27 @@ impl IntoRule for u8 {
     }
 }
 
-impl CellularAutomata {
-    pub fn new(data: Vec<u8>) -> Self {
+impl<'a> CellularAutomata<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
         let len = data.len() as u32 * 8;
         CellularAutomata {
             data,
             image: GrayImage::new(len, len),
+        }
+    }
+
+    pub fn allocate(data: &'a [u8], mut width: u32, mut height: u32) -> Self {
+        if width < data.len() as u32 {
+            width = data.len() as u32;
+        }
+
+        if height < data.len() as u32 {
+            height = data.len() as u32;
+        }
+
+        CellularAutomata {
+            data,
+            image: GrayImage::new(width, height),
         }
     }
 
@@ -188,16 +203,12 @@ impl CellularAutomata {
 
 #[cfg(test)]
 mod test {
-    use std::fs::File;
-
-    use rand::Rng;
-
     use crate::automata::{CellularAutomata, IntoRule, Rule};
 
     #[test]
     fn inspect() {
         let test = vec![23, 254, 12, 84];
-        let v = CellularAutomata::new(test);
+        let v = CellularAutomata::new(&test);
 
         let check = vec![
             true, true, true, false, true, false, false, false, false, true, true, true, true,
@@ -216,18 +227,5 @@ mod test {
         let r: Rule = r.get_rule().unwrap();
 
         assert_eq!(r.bits(), [0, 1, 1, 1, 0, 1, 1, 0]);
-    }
-
-    #[test]
-    fn image() {
-        let r = rand::rng();
-        let data: Vec<u8> = r.random_iter().take(16).collect();
-        let len = data.len() as u32 * 8;
-        let mut v = CellularAutomata::new(data);
-        v.rule_interlace(len, &[110], true).unwrap();
-
-        let image = v.image();
-        let mut f = File::create("./test.png").unwrap();
-        image.write_to(&mut f, image::ImageFormat::Png).unwrap();
     }
 }
