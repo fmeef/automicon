@@ -5,18 +5,18 @@ use crate::{
     image::{PIXEL_DARK, PIXEL_LIGHT},
 };
 
-pub struct CellularAutomata<'a> {
-    data: &'a [u8],
+pub struct CellularAutomata {
     pub image: GrayImage,
 }
 
 pub struct RuleInterlace<'a, 'b, 'c, T> {
     iterations: u32,
     rule: &'b [T],
+    data: &'c [u8],
     second: bool,
     offset_x: u32,
     offset_y: u32,
-    automata: &'a mut CellularAutomata<'c>,
+    automata: &'a mut CellularAutomata,
 }
 
 impl<'a, 'b, 'c, T> RuleInterlace<'a, 'b, 'c, T>
@@ -39,8 +39,32 @@ where
         self
     }
 
+    #[inline(always)]
+    fn inspect(&self, pos: usize) -> bool {
+        let i = (pos / 8) as usize;
+        let x = (pos % 8) as usize;
+        match self.data.get(i) {
+            Some(v) => (*v >> x) & 0x1 == 1,
+            None => false,
+        }
+    }
+
+    fn starting_line(&mut self) {
+        for i in 0..self.data.len() * 8 {
+            if self.inspect(i) {
+                self.automata
+                    .image
+                    .put_pixel(i as u32 + self.offset_x, self.offset_y, PIXEL_DARK);
+            } else {
+                self.automata
+                    .image
+                    .put_pixel(i as u32 + self.offset_x, self.offset_y, PIXEL_LIGHT);
+            }
+        }
+    }
+
     pub fn run(&mut self) -> Result<()> {
-        self.automata.starting_line();
+        self.starting_line();
 
         let mut count = if self.second { 1 } else { 0 };
 
@@ -49,7 +73,7 @@ where
                 count += 1;
                 let rule = rule.get_rule()?;
 
-                for v in 0..self.automata.data.len() * 8 {
+                for v in 0..self.data.len() * 8 {
                     let v = v as u32;
 
                     let a = if v > 0 {
@@ -66,7 +90,7 @@ where
                         .image
                         .get_pixel(v + self.offset_x, count - 1 + self.offset_y);
 
-                    let c = if v + 1 < self.automata.data.len() as u32 * 8 {
+                    let c = if v + 1 < self.data.len() as u32 * 8 {
                         *self
                             .automata
                             .image
@@ -198,57 +222,31 @@ impl IntoRule for u8 {
     }
 }
 
-impl<'a> CellularAutomata<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
+impl CellularAutomata {
+    pub fn new(data: &[u8]) -> Self {
         let len = data.len() as u32 * 8;
-        CellularAutomata {
-            data,
+        Self {
             image: GrayImage::new(len, len),
         }
     }
-
-    pub fn allocate(data: &'a [u8], mut width: u32, mut height: u32) -> Self {
-        if width < data.len() as u32 {
-            width = data.len() as u32;
-        }
-
-        if height < data.len() as u32 {
-            height = data.len() as u32;
-        }
-
+    pub fn allocate(width: u32, height: u32) -> Self {
         CellularAutomata {
-            data,
             image: GrayImage::new(width, height),
         }
     }
 
-    #[inline(always)]
-    fn inspect(&self, pos: usize) -> bool {
-        let i = (pos / 8) as usize;
-        let x = (pos % 8) as usize;
-        match self.data.get(i) {
-            Some(v) => (*v >> x) & 0x1 == 1,
-            None => false,
-        }
-    }
-
-    fn starting_line(&mut self) {
-        for i in 0..self.data.len() * 8 {
-            if self.inspect(i) {
-                self.image.put_pixel(i as u32, 0, PIXEL_DARK);
-            } else {
-                self.image.put_pixel(i as u32, 0, PIXEL_LIGHT);
-            }
-        }
-    }
-
-    pub fn rule_interlace<'b, 'c, T>(&'c mut self, rule: &'b [T]) -> RuleInterlace<'c, 'b, 'a, T>
+    pub fn rule_interlace<'a, 'b, 'c, T>(
+        &'c mut self,
+        rule: &'b [T],
+        data: &'a [u8],
+    ) -> RuleInterlace<'c, 'b, 'a, T>
     where
         T: IntoRule,
     {
         RuleInterlace {
-            iterations: self.data.len() as u32 * 8,
+            iterations: data.len() as u32 * 8,
             rule,
+            data,
             second: false,
             offset_x: 0,
             offset_y: 0,
@@ -264,7 +262,9 @@ mod test {
     #[test]
     fn inspect() {
         let test = vec![23, 254, 12, 84];
-        let v = CellularAutomata::new(&test);
+
+        let mut v = CellularAutomata::new(&test);
+        let v = v.rule_interlace(&[110], &test);
 
         let check = vec![
             true, true, true, false, true, false, false, false, false, true, true, true, true,
