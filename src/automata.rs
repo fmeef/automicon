@@ -53,15 +53,24 @@ where
                     let v = v as u32;
 
                     let a = if v > 0 {
-                        *self.automata.image.get_pixel(v - 1, count - 1)
+                        *self
+                            .automata
+                            .image
+                            .get_pixel(v - 1 + self.offset_x, count - 1 + self.offset_y)
                     } else {
                         PIXEL_LIGHT
                     };
 
-                    let b = *self.automata.image.get_pixel(v, count - 1);
+                    let b = *self
+                        .automata
+                        .image
+                        .get_pixel(v + self.offset_x, count - 1 + self.offset_y);
 
                     let c = if v + 1 < self.automata.data.len() as u32 * 8 {
-                        *self.automata.image.get_pixel(v + 1, count - 1)
+                        *self
+                            .automata
+                            .image
+                            .get_pixel(v + 1 + self.offset_x, count - 1 + self.offset_y)
                     } else {
                         PIXEL_LIGHT
                     };
@@ -91,16 +100,26 @@ where
                     }
 
                     if self.second {
-                        let old = *self.automata.image.get_pixel(v, count - 2) == PIXEL_DARK;
+                        let old = *self
+                            .automata
+                            .image
+                            .get_pixel(v + self.offset_x, count - 2 + self.offset_y)
+                            == PIXEL_DARK;
 
                         let new = if old ^ (n == PIXEL_DARK) {
                             PIXEL_DARK
                         } else {
                             PIXEL_LIGHT
                         };
-                        self.automata.image.put_pixel(v, count, new);
+                        self.automata.image.put_pixel(
+                            v + self.offset_x,
+                            count + self.offset_y,
+                            new,
+                        );
                     } else {
-                        self.automata.image.put_pixel(v, count, n);
+                        self.automata
+                            .image
+                            .put_pixel(v + self.offset_x, count + self.offset_y, n);
                     }
                 }
             }
@@ -228,7 +247,7 @@ impl<'a> CellularAutomata<'a> {
         T: IntoRule,
     {
         RuleInterlace {
-            iterations: self.data.len() as u32,
+            iterations: self.data.len() as u32 * 8,
             rule,
             second: false,
             offset_x: 0,
