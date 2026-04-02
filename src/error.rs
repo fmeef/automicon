@@ -6,4 +6,6 @@ pub enum Error {
     InvalidRule,
     #[error("Invalid image")]
     InvalidImage,
+    #[error("Invalid data length")]
+    InvalidLength,
 }

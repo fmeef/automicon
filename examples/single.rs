@@ -7,8 +7,8 @@ use rand::Rng;
 fn main() {
     let r = rand::rng();
     let data: Vec<u8> = r.random_iter().take(16).collect();
-    let mut v = CellularAutomata::new(&data);
-    v.rule_interlace(&[110], &data).run().unwrap();
+    let mut v = CellularAutomata::new(&data).unwrap();
+    v.rule_interlace(&[110], &data).unwrap().run().unwrap();
 
     let image = resize(
         &v.image,

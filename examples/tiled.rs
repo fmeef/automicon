@@ -16,6 +16,7 @@ fn main() {
             let rule = data[x + 1 * y];
             println!("rule={rule} offset={x},{y}");
             v.rule_interlace(&[rule], &[data[x * y]])
+                .unwrap()
                 .offset(step * x as u32, step * y as u32)
                 .second(false)
                 .run()

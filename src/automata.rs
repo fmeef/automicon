@@ -154,6 +154,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
 pub struct Rule(u8);
 
 impl Rule {
@@ -223,11 +224,14 @@ impl IntoRule for u8 {
 }
 
 impl CellularAutomata {
-    pub fn new(data: &[u8]) -> Self {
-        let len = data.len() as u32 * 8;
-        Self {
-            image: GrayImage::new(len, len),
+    pub fn new(data: &[u8]) -> Result<Self> {
+        if data.len() >= u32::MAX as usize {
+            return Err(Error::InvalidLength);
         }
+        let len = data.len() as u32 * 8;
+        Ok(Self {
+            image: GrayImage::new(len, len),
+        })
     }
     pub fn allocate(width: u32, height: u32) -> Self {
         CellularAutomata {
@@ -239,11 +243,15 @@ impl CellularAutomata {
         &'c mut self,
         rule: &'b [T],
         data: &'a [u8],
-    ) -> RuleInterlace<'c, 'b, 'a, T>
+    ) -> Result<RuleInterlace<'c, 'b, 'a, T>>
     where
         T: IntoRule,
     {
-        RuleInterlace {
+        if data.len() >= u32::MAX as usize {
+            return Err(Error::InvalidLength);
+        }
+
+        Ok(RuleInterlace {
             iterations: data.len() as u32 * 8,
             rule,
             data,
@@ -251,7 +259,7 @@ impl CellularAutomata {
             offset_x: 0,
             offset_y: 0,
             automata: self,
-        }
+        })
     }
 }
 
@@ -263,8 +271,8 @@ mod test {
     fn inspect() {
         let test = vec![23, 254, 12, 84];
 
-        let mut v = CellularAutomata::new(&test);
-        let v = v.rule_interlace(&[110], &test);
+        let mut v = CellularAutomata::new(&test).unwrap();
+        let v = v.rule_interlace(&[110], &test).unwrap();
 
         let check = vec![
             true, true, true, false, true, false, false, false, false, true, true, true, true,
